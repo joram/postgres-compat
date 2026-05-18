@@ -1,0 +1,72 @@
+tests:
+
+  - id: datatype-pg-trgm-similarity
+    description: "pg_trgm trigram similarity returns expected score"
+    core: false
+    extension: pg_trgm
+    probe:
+      - "SELECT similarity('postgres', 'postgrey')"
+    validate:
+      returns_value:
+        sql: "SELECT (similarity('postgres', 'postgres') = 1.0)::text"
+        equals: "true"
+
+  - id: datatype-hstore-roundtrip
+    description: "hstore key-value type round-trips through SQL"
+    core: false
+    extension: hstore
+    setup:
+      - "CREATE TABLE t_hs (h hstore)"
+      - "INSERT INTO t_hs VALUES ('a=>1, b=>2'::hstore)"
+    probe:
+      - "SELECT h->'a' FROM t_hs"
+    validate:
+      returns_value:
+        sql: "SELECT h->'a' FROM t_hs"
+        equals: "1"
+    teardown:
+      - "DROP TABLE t_hs"
+
+  - id: datatype-citext-case-insensitive
+    description: "citext type performs case-insensitive equality"
+    core: false
+    extension: citext
+    probe:
+      - "SELECT 'Foo'::citext = 'FOO'::citext"
+    validate:
+      returns_value:
+        sql: "SELECT ('Foo'::citext = 'FOO'::citext)::text"
+        equals: "true"
+
+  - id: datatype-uuid-ossp-v5-deterministic
+    description: "uuid-ossp v5 produces the canonical RFC-4122 v5 UUID for (DNS namespace, 'example.com'). v4 testing was dropped: PG13+ ships gen_random_uuid() in core, so v4 generation is no longer uniquely contrib. uuid-ossp v1/v3/v5 remain contrib-only."
+    core: false
+    extension: uuid-ossp
+    probe:
+      - "SELECT uuid_generate_v5(uuid_ns_dns(), 'example.com')"
+    validate:
+      returns_value:
+        sql: "SELECT uuid_generate_v5(uuid_ns_dns(), 'example.com')::text"
+        equals: "cfbff0d1-9375-5685-968c-48ce8b15ae17"
+
+  - id: datatype-ltree-containment
+    description: "ltree label tree containment operator <@"
+    core: false
+    extension: ltree
+    probe:
+      - "SELECT 'a.b.c'::ltree <@ 'a.b'::ltree"
+    validate:
+      returns_value:
+        sql: "SELECT ('a.b.c'::ltree <@ 'a.b'::ltree)::text"
+        equals: "true"
+
+  - id: datatype-intarray-idx
+    description: "intarray idx() returns 1-based position of element in int array"
+    core: false
+    extension: intarray
+    probe:
+      - "SELECT idx(ARRAY[10,20,30,40]::int[], 30)"
+    validate:
+      returns_value:
+        sql: "SELECT (idx(ARRAY[10,20,30,40]::int[], 30) = 3)::text"
+        equals: "true"

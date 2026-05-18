@@ -1,0 +1,146 @@
+tests:
+
+  # Anti-silent-failure flagship. ALTER SYSTEM SET writes to postgresql.auto.conf,
+  # which is reflected in pg_file_settings before any reload. A target that
+  # accepts ALTER SYSTEM but doesn't actually persist it is the textbook silent
+  # failure — and the explicit headline this harness exists to catch.
+
+  - id: maint-alter-system-silent-failure
+    description: "ALTER SYSTEM SET writes to postgresql.auto.conf (anti-silent-failure)"
+    core: true
+    serial: true
+    probe:
+      - "ALTER SYSTEM SET log_min_duration_statement = 12345"
+    validate:
+      returns_value:
+        sql: "SELECT setting FROM pg_file_settings WHERE name = 'log_min_duration_statement' AND sourcefile LIKE '%postgresql.auto.conf' ORDER BY sourceline DESC LIMIT 1"
+        equals: "12345"
+    teardown:
+      - "ALTER SYSTEM RESET log_min_duration_statement"
+
+  # CHECKPOINT — DBA primitive. Vanilla superuser succeeds; PG15+ also accepts
+  # pg_checkpoint role members. RDS denies for non-superuser app accounts.
+
+  - id: maint-checkpoint
+    description: "CHECKPOINT command succeeds (requires superuser or pg_checkpoint role)"
+    core: true
+    probe:
+      - "CHECKPOINT"
+
+  # Progress views — what DBAs query during long-running maintenance.
+
+  - id: maint-pg-stat-progress-vacuum
+    description: "pg_stat_progress_vacuum view is queryable"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_stat_progress_vacuum LIMIT 1"
+
+  - id: maint-pg-stat-progress-analyze
+    description: "pg_stat_progress_analyze view is queryable"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_stat_progress_analyze LIMIT 1"
+
+  - id: maint-pg-stat-progress-cluster
+    description: "pg_stat_progress_cluster view is queryable"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_stat_progress_cluster LIMIT 1"
+
+  - id: maint-pg-stat-progress-create-index
+    description: "pg_stat_progress_create_index view is queryable"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_stat_progress_create_index LIMIT 1"
+
+  - id: maint-pg-stat-progress-basebackup
+    description: "pg_stat_progress_basebackup view is queryable"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_stat_progress_basebackup LIMIT 1"
+
+  - id: maint-pg-stat-progress-copy
+    description: "pg_stat_progress_copy view is queryable (PG14+)"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_stat_progress_copy LIMIT 1"
+
+  - id: maint-pg-stat-wal
+    description: "pg_stat_wal view is queryable (PG14+)"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_stat_wal LIMIT 1"
+
+  - id: maint-pg-stat-io
+    description: "pg_stat_io view is queryable (PG16+)"
+    core: true
+    supported_versions: [16, 17, 18]
+    probe:
+      - "SELECT 1 FROM pg_stat_io LIMIT 1"
+
+  # Lock and wait diagnostics. pg_blocking_pids is the canonical
+  # blocker-finder; wait_event columns are the canonical "what's it waiting on."
+
+  - id: maint-pg-blocking-pids
+    description: "pg_blocking_pids() returns array (lock blocker diagnosis)"
+    core: true
+    probe:
+      - "SELECT pg_blocking_pids(pg_backend_pid())"
+    validate:
+      returns_value:
+        sql: "SELECT (pg_blocking_pids(pg_backend_pid()) IS NOT NULL)::text"
+        equals: "true"
+
+  - id: maint-wait-event-columns
+    description: "pg_stat_activity exposes wait_event_type and wait_event columns"
+    core: true
+    probe:
+      - "SELECT wait_event_type, wait_event FROM pg_stat_activity WHERE pid = pg_backend_pid()"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_stat_activity WHERE pid = pg_backend_pid()"
+        equals: "1"
+
+  - id: maint-pg-cancel-backend-exists
+    description: "pg_cancel_backend() function present in pg_proc"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_proc WHERE proname = 'pg_cancel_backend'"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_proc WHERE proname = 'pg_cancel_backend'"
+        equals: "1"
+
+  - id: maint-pg-terminate-backend-exists
+    description: "pg_terminate_backend() function present in pg_proc"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_proc WHERE proname = 'pg_terminate_backend'"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_proc WHERE proname = 'pg_terminate_backend'"
+        equals: "1"
+
+  # Connection-state cleanup. Connection poolers (PgBouncer, PgCat, Odyssey)
+  # rely on this to reset session state between checkouts.
+
+  - id: maint-discard-all
+    description: "DISCARD ALL succeeds (used by connection poolers)"
+    core: true
+    probe:
+      - "DISCARD ALL"
+
+  # amcheck — DBA tool for verifying B-tree integrity. Heavily used in incident response.
+
+  - id: maint-amcheck-bt-index-check
+    description: "amcheck bt_index_check() verifies a B-tree index without error"
+    core: false
+    extension: amcheck
+    setup:
+      - "CREATE TABLE t_amcheck (id INT)"
+      - "INSERT INTO t_amcheck SELECT generate_series(1, 100)"
+      - "CREATE INDEX t_amcheck_idx ON t_amcheck USING btree (id)"
+    probe:
+      - "SELECT bt_index_check('t_amcheck_idx'::regclass)"
+    teardown:
+      - "DROP TABLE t_amcheck"

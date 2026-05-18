@@ -1,0 +1,12 @@
+postgres-compat
+report*.yaml
+*.test
+upstream/
+.claude/
+CLAUDE.md
+*.pdf
+*.tex
+* copy.md
+*.bak
+*.swp
+.DS_Store

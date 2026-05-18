@@ -1,0 +1,58 @@
+tests:
+
+  - id: feature-pgcrypto-digest
+    description: "pgcrypto digest() returns SHA-256 hash"
+    core: false
+    extension: pgcrypto
+    probe:
+      - "SELECT digest('hello', 'sha256')"
+    validate:
+      returns_value:
+        sql: "SELECT encode(digest('hello', 'sha256'), 'hex')"
+        equals: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+
+  - id: feature-postgres-fdw-loopback-query
+    description: "postgres_fdw federates a SELECT through a self-loopback server (Unix socket, local trust auth). Verifies BeginForeignScan → IterateForeignScan → EndForeignScan end-to-end, not just CREATE SERVER."
+    core: false
+    extension: postgres_fdw
+    setup:
+      - "CREATE SERVER t_fdw_lo_{runid} FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '/tmp', dbname '{dbname}')"
+      - "CREATE USER MAPPING FOR CURRENT_USER SERVER t_fdw_lo_{runid} OPTIONS (user '{user}')"
+      - "CREATE FOREIGN TABLE t_fdw_lo_pgproc_{runid} (proname name) SERVER t_fdw_lo_{runid} OPTIONS (schema_name 'pg_catalog', table_name 'pg_proc')"
+    probe:
+      - "SELECT count(*) FROM t_fdw_lo_pgproc_{runid} WHERE proname = 'now'"
+    validate:
+      returns_value:
+        sql: "SELECT (count(*) > 0)::text FROM t_fdw_lo_pgproc_{runid} WHERE proname = 'now'"
+        equals: "true"
+    teardown:
+      - "DROP FOREIGN TABLE IF EXISTS t_fdw_lo_pgproc_{runid}"
+      - "DROP USER MAPPING IF EXISTS FOR CURRENT_USER SERVER t_fdw_lo_{runid}"
+      - "DROP SERVER IF EXISTS t_fdw_lo_{runid}"
+
+  - id: feature-tablefunc-crosstab
+    description: "tablefunc crosstab() pivots row data into columns"
+    core: false
+    extension: tablefunc
+    probe:
+      - "SELECT * FROM crosstab($$ SELECT 'r1', 'c1', 1 UNION ALL SELECT 'r1', 'c2', 2 ORDER BY 1,2 $$) AS ct(rn text, c1 int, c2 int)"
+    validate:
+      returns_value:
+        sql: "SELECT (count(*) = 1)::text FROM crosstab($$ SELECT 'r1', 'c1', 1 UNION ALL SELECT 'r1', 'c2', 2 ORDER BY 1,2 $$) AS ct(rn text, c1 int, c2 int)"
+        equals: "true"
+
+  - id: feature-tsm-system-rows
+    description: "TABLESAMPLE SYSTEM_ROWS returns the requested row count"
+    core: false
+    extension: tsm_system_rows
+    setup:
+      - "CREATE TABLE t_tsm (id INT)"
+      - "INSERT INTO t_tsm SELECT generate_series(1, 1000)"
+    probe:
+      - "SELECT * FROM t_tsm TABLESAMPLE SYSTEM_ROWS(10)"
+    validate:
+      returns_value:
+        sql: "SELECT (count(*) = 10)::text FROM t_tsm TABLESAMPLE SYSTEM_ROWS(10)"
+        equals: "true"
+    teardown:
+      - "DROP TABLE t_tsm"

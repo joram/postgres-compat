@@ -1,0 +1,19 @@
+tests:
+
+  - id: tools-pg-walinspect-decode-records
+    description: "pg_walinspect decodes WAL records over a recent LSN range — verifies the decoder actually reads WAL, not just that the function exists in pg_proc. Uses pg_current_wal_lsn() - 4096 as start so we never reference a recycled LSN."
+    core: false
+    extension: pg_walinspect
+    supported_versions: [15, 16, 17, 18]
+    setup:
+      # Force fresh WAL by writing a row before the probe.
+      - "CREATE TABLE t_walinspect (id INT)"
+      - "INSERT INTO t_walinspect VALUES (1)"
+    probe:
+      - "SELECT count(*) FROM pg_get_wal_records_info(pg_current_wal_lsn() - 4096, pg_current_wal_lsn())"
+    validate:
+      returns_value:
+        sql: "SELECT (count(*) > 0)::text FROM pg_get_wal_records_info(pg_current_wal_lsn() - 4096, pg_current_wal_lsn())"
+        equals: "true"
+    teardown:
+      - "DROP TABLE t_walinspect"

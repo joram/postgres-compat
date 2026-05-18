@@ -1,0 +1,110 @@
+tests:
+
+  - id: constraints-unique-enforcement
+    description: "UNIQUE constraint enforces uniqueness (ERROR 23505)"
+    core: true
+    setup:
+      - "CREATE TABLE t_unique (id INT UNIQUE)"
+      - "INSERT INTO t_unique VALUES (1)"
+    probe:
+      - "INSERT INTO t_unique VALUES (1)"
+    expect_error: "23505"
+    teardown:
+      - "DROP TABLE t_unique"
+
+  - id: constraints-check
+    description: "CHECK constraint enforcement (ERROR 23514)"
+    core: true
+    setup:
+      - "CREATE TABLE t_check (id INT CHECK (id > 0))"
+    probe:
+      - "INSERT INTO t_check VALUES (-1)"
+    expect_error: "23514"
+    teardown:
+      - "DROP TABLE t_check"
+
+  - id: constraints-not-null
+    description: "NOT NULL constraint enforcement (ERROR 23502)"
+    core: true
+    setup:
+      - "CREATE TABLE t_not_null (id INT NOT NULL)"
+    probe:
+      - "INSERT INTO t_not_null VALUES (NULL)"
+    expect_error: "23502"
+    teardown:
+      - "DROP TABLE t_not_null"
+
+  - id: constraints-exclusion
+    description: "Exclusion constraint prevents overlapping ranges (ERROR 23P01)"
+    core: true
+    setup:
+      - "CREATE TABLE t_excl (r tsrange, EXCLUDE USING gist (r WITH &&))"
+      - "INSERT INTO t_excl VALUES ('[2020-01-01, 2020-01-10)'::tsrange)"
+    probe:
+      - "INSERT INTO t_excl VALUES ('[2020-01-05, 2020-01-15)'::tsrange)"
+    expect_error: "23P01"
+    teardown:
+      - "DROP TABLE t_excl"
+
+  - id: error-divide-by-zero
+    description: "Division by zero raises ERROR 22012"
+    core: true
+    probe:
+      - "SELECT 1/0"
+    expect_error: "22012"
+
+  - id: error-numeric-overflow
+    description: "Integer overflow raises ERROR 22003"
+    core: true
+    probe:
+      - "SELECT 2147483647::int + 1"
+    expect_error: "22003"
+
+  - id: error-undefined-column
+    description: "Reference to undefined column raises ERROR 42703"
+    core: true
+    setup:
+      - "CREATE TABLE t_undef_col (a INT)"
+    probe:
+      - "SELECT b FROM t_undef_col"
+    expect_error: "42703"
+    teardown:
+      - "DROP TABLE t_undef_col"
+
+  - id: error-undefined-function
+    description: "Call to undefined function raises ERROR 42883"
+    core: true
+    probe:
+      - "SELECT no_such_function_xyz(1)"
+    expect_error: "42883"
+
+  - id: error-undefined-table
+    description: "Reference to undefined table raises ERROR 42P01"
+    core: true
+    probe:
+      - "SELECT 1 FROM no_such_table_xyz"
+    expect_error: "42P01"
+
+  - id: error-fk-violation
+    description: "FK violation on insert raises ERROR 23503"
+    core: true
+    setup:
+      - "CREATE TABLE t_fk_p (id INT PRIMARY KEY)"
+      - "CREATE TABLE t_fk_c (pid INT REFERENCES t_fk_p(id))"
+    probe:
+      - "INSERT INTO t_fk_c VALUES (999)"
+    expect_error: "23503"
+    teardown:
+      - "DROP TABLE t_fk_c"
+      - "DROP TABLE t_fk_p"
+
+  - id: error-currval-no-nextval
+    description: "currval() before nextval() in session raises ERROR 55000"
+    core: true
+    setup:
+      - "CREATE SEQUENCE t_seq_nv"
+    probe:
+      - "SELECT currval('t_seq_nv')"
+    expect_error: "55000"
+    teardown:
+      - "DROP SEQUENCE t_seq_nv"

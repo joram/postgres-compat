@@ -1,0 +1,25 @@
+tests:
+
+  - id: replication-publication
+    description: "Logical replication PUBLICATION creation"
+    core: true
+    serial: true
+    setup:
+      - "CREATE TABLE t_pub_table (id INT PRIMARY KEY)"
+    probe:
+      - "CREATE PUBLICATION t_pub FOR TABLE t_pub_table"
+    teardown:
+      - "DROP PUBLICATION t_pub"
+      - "DROP TABLE t_pub_table"
+
+  - id: replication-logical-slot
+    description: "Logical replication slot via built-in pgoutput plugin (requires wal_level=logical)"
+    core: false
+    probe:
+      - "SELECT pg_create_logical_replication_slot('t_logl_{runid}', 'pgoutput')"
+    validate:
+      returns_value:
+        sql: "SELECT slot_type FROM pg_replication_slots WHERE slot_name = 't_logl_{runid}'"
+        equals: "logical"
+    teardown:
+      - "SELECT pg_drop_replication_slot('t_logl_{runid}')"

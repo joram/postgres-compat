@@ -1,0 +1,88 @@
+tests:
+
+  - id: indexing-btree-create
+    description: "CREATE INDEX (BTREE) lands a catalog entry"
+    core: true
+    setup:
+      - "CREATE TABLE t_idx_btree (id INT)"
+    probe:
+      - "CREATE INDEX t_idx_btree_idx ON t_idx_btree USING btree (id)"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 't_idx_btree_idx'"
+        equals: "1"
+    teardown:
+      - "DROP TABLE t_idx_btree"
+
+  - id: indexing-gin-create
+    description: "CREATE INDEX (GIN) lands a catalog entry"
+    core: true
+    setup:
+      - "CREATE TABLE t_idx_gin (doc JSONB)"
+    probe:
+      - "CREATE INDEX t_idx_gin_idx ON t_idx_gin USING gin (doc)"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 't_idx_gin_idx'"
+        equals: "1"
+    teardown:
+      - "DROP TABLE t_idx_gin"
+
+  - id: indexing-gist-create
+    description: "CREATE INDEX (GIST) lands a catalog entry"
+    core: true
+    setup:
+      - "CREATE TABLE t_idx_gist (r tsrange)"
+    probe:
+      - "CREATE INDEX t_idx_gist_idx ON t_idx_gist USING gist (r)"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 't_idx_gist_idx'"
+        equals: "1"
+    teardown:
+      - "DROP TABLE t_idx_gist"
+
+  - id: indexing-hash-create
+    description: "CREATE INDEX (HASH) lands a catalog entry"
+    core: false
+    setup:
+      - "CREATE TABLE t_idx_hash (id INT)"
+    probe:
+      - "CREATE INDEX t_idx_hash_idx ON t_idx_hash USING hash (id)"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 't_idx_hash_idx'"
+        equals: "1"
+    teardown:
+      - "DROP TABLE t_idx_hash"
+
+  - id: indexing-btree-gist-exclusion
+    description: "btree_gist enables exclusion constraints with equality on integers"
+    core: false
+    extension: btree_gist
+    setup:
+      - "CREATE TABLE t_bt_gist (id INT, EXCLUDE USING gist (id WITH =))"
+      - "INSERT INTO t_bt_gist VALUES (1)"
+    probe:
+      - "INSERT INTO t_bt_gist VALUES (1)"
+    expect_error: "23P01"
+    teardown:
+      - "DROP TABLE t_bt_gist"
+
+  - id: indexing-bloom-create-and-query
+    description: "CREATE INDEX (BLOOM) creates a usable index; a multi-column equality query through the table returns the single matching row"
+    core: false
+    extension: bloom
+    setup:
+      - "CREATE TABLE t_idx_bloom (a INT, b INT, c INT)"
+      - "INSERT INTO t_idx_bloom SELECT g, g % 100, g % 1000 FROM generate_series(1, 1000) g"
+      - "CREATE INDEX t_idx_bloom_idx ON t_idx_bloom USING bloom (a, b, c)"
+      - "ANALYZE t_idx_bloom"
+    probe:
+      - "SELECT a FROM t_idx_bloom WHERE a = 42 AND b = 42 AND c = 42"
+    validate:
+      returns_value:
+        sql: "SELECT a::text FROM t_idx_bloom WHERE a = 42 AND b = 42 AND c = 42"
+        equals: "42"
+    teardown:
+      - "DROP TABLE t_idx_bloom"

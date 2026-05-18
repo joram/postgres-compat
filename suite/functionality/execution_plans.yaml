@@ -1,0 +1,27 @@
+tests:
+
+  - id: performance-unlogged-wal-minimal
+    description: "UNLOGGED tables produce substantially less WAL than LOGGED tables on bulk insert"
+    core: true
+    setup:
+      - "CREATE UNLOGGED TABLE t_unlog_u (id INT)"
+      - "CREATE TABLE t_unlog_l (id INT)"
+    probe:
+      - |
+        DO $$
+        DECLARE
+          plan json;
+          unlogged_wal bigint;
+          logged_wal bigint;
+        BEGIN
+          EXECUTE 'EXPLAIN (ANALYZE, WAL, FORMAT JSON, COSTS off, TIMING off, SUMMARY off, BUFFERS off) INSERT INTO t_unlog_u SELECT generate_series(1, 10000)' INTO plan;
+          unlogged_wal := COALESCE((plan->0->'Plan'->>'WAL Bytes')::bigint, 0);
+          EXECUTE 'EXPLAIN (ANALYZE, WAL, FORMAT JSON, COSTS off, TIMING off, SUMMARY off, BUFFERS off) INSERT INTO t_unlog_l SELECT generate_series(1, 10000)' INTO plan;
+          logged_wal := COALESCE((plan->0->'Plan'->>'WAL Bytes')::bigint, 0);
+          IF unlogged_wal * 2 >= logged_wal THEN
+            RAISE EXCEPTION 'UNLOGGED WAL (% bytes) not at least 2x less than LOGGED WAL (% bytes)', unlogged_wal, logged_wal;
+          END IF;
+        END $$
+    teardown:
+      - "DROP TABLE t_unlog_u"
+      - "DROP TABLE t_unlog_l"

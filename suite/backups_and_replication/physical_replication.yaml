@@ -1,0 +1,13 @@
+tests:
+
+  - id: replication-physical-slot
+    description: "Physical replication slot can be created and inspected"
+    core: true
+    probe:
+      - "SELECT pg_create_physical_replication_slot('t_phys_{runid}', false)"
+    validate:
+      returns_value:
+        sql: "SELECT slot_type FROM pg_replication_slots WHERE slot_name = 't_phys_{runid}'"
+        equals: "physical"
+    teardown:
+      - "SELECT pg_drop_replication_slot('t_phys_{runid}')"

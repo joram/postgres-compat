@@ -1,0 +1,131 @@
+tests:
+
+  # Backup-tool primitives. pgBackRest, Barman, WAL-G and pg_basebackup all
+  # call these. RDS, Aurora, Neon and similar managed services routinely
+  # restrict or omit them.
+
+  - id: wal-current-lsn-callable
+    description: "pg_current_wal_lsn() returns a non-null LSN"
+    core: true
+    probe:
+      - "SELECT pg_current_wal_lsn()"
+    validate:
+      returns_value:
+        sql: "SELECT (pg_current_wal_lsn() IS NOT NULL)::text"
+        equals: "true"
+
+  - id: wal-walfile-name-callable
+    description: "pg_walfile_name() returns a 24-char WAL file name"
+    core: true
+    probe:
+      - "SELECT pg_walfile_name(pg_current_wal_lsn())"
+    validate:
+      returns_value:
+        sql: "SELECT (length(pg_walfile_name(pg_current_wal_lsn())) = 24)::text"
+        equals: "true"
+
+  - id: wal-lsn-diff-callable
+    description: "pg_wal_lsn_diff() returns numeric byte distance between LSNs"
+    core: true
+    probe:
+      - "SELECT pg_wal_lsn_diff('0/2000000'::pg_lsn, '0/1000000'::pg_lsn)"
+    validate:
+      returns_value:
+        sql: "SELECT pg_wal_lsn_diff('0/2000000'::pg_lsn, '0/1000000'::pg_lsn)::text"
+        equals: "16777216"
+
+  - id: wal-switch-function-exists
+    description: "pg_switch_wal() function present in pg_proc"
+    core: true
+    probe:
+      - "SELECT 1 FROM pg_proc WHERE proname = 'pg_switch_wal'"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_proc WHERE proname = 'pg_switch_wal'"
+        equals: "1"
+
+  - id: wal-backup-start-function-exists
+    description: "pg_backup_start() function present in pg_proc (PG15+)"
+    core: true
+    supported_versions: [15, 16, 17, 18]
+    probe:
+      - "SELECT 1 FROM pg_proc WHERE proname = 'pg_backup_start'"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_proc WHERE proname = 'pg_backup_start'"
+        equals: "1"
+
+  - id: wal-backup-stop-function-exists
+    description: "pg_backup_stop() function present in pg_proc (PG15+)"
+    core: true
+    supported_versions: [15, 16, 17, 18]
+    probe:
+      - "SELECT 1 FROM pg_proc WHERE proname = 'pg_backup_stop'"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_proc WHERE proname = 'pg_backup_stop'"
+        equals: "1"
+
+  - id: wal-start-backup-function-exists-pg14
+    description: "pg_start_backup() function present in pg_proc (PG14, removed in PG15)"
+    core: true
+    supported_versions: [14]
+    probe:
+      - "SELECT 1 FROM pg_proc WHERE proname = 'pg_start_backup'"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_proc WHERE proname = 'pg_start_backup'"
+        equals: "1"
+
+  - id: wal-stop-backup-function-exists-pg14
+    description: "pg_stop_backup() function present in pg_proc (PG14, removed in PG15)"
+    core: true
+    supported_versions: [14]
+    probe:
+      - "SELECT 1 FROM pg_proc WHERE proname = 'pg_stop_backup'"
+    validate:
+      returns_value:
+        sql: "SELECT count(*)::text FROM pg_proc WHERE proname = 'pg_stop_backup'"
+        equals: "1"
+
+  # Configuration visibility. Every CDC and backup tool checks these at startup.
+
+  - id: wal-level-visible
+    description: "wal_level is visible (replica/logical/minimal)"
+    core: true
+    probe:
+      - "SHOW wal_level"
+    validate:
+      returns_value:
+        sql: "SELECT (current_setting('wal_level') IN ('replica','logical','minimal'))::text"
+        equals: "true"
+
+  - id: wal-archive-mode-visible
+    description: "archive_mode is visible (on/off/always)"
+    core: true
+    probe:
+      - "SHOW archive_mode"
+    validate:
+      returns_value:
+        sql: "SELECT (current_setting('archive_mode') IN ('on','off','always'))::text"
+        equals: "true"
+
+  - id: wal-max-wal-senders-visible
+    description: "max_wal_senders is visible as integer"
+    core: true
+    probe:
+      - "SHOW max_wal_senders"
+    validate:
+      returns_value:
+        sql: "SELECT (current_setting('max_wal_senders')::int >= 0)::text"
+        equals: "true"
+
+  - id: wal-max-replication-slots-visible
+    description: "max_replication_slots is visible as integer"
+    core: true
+    probe:
+      - "SHOW max_replication_slots"
+    validate:
+      returns_value:
+        sql: "SELECT (current_setting('max_replication_slots')::int >= 0)::text"
+        equals: "true"
