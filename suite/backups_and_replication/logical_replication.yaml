@@ -3,6 +3,7 @@ tests:
   - id: replication-publication
     description: "Logical replication PUBLICATION creation"
     core: true
+    alter: true
     serial: true
     setup:
       - "CREATE TABLE t_pub_table (id INT PRIMARY KEY)"
@@ -15,6 +16,7 @@ tests:
   - id: replication-logical-slot
     description: "Logical replication slot via built-in pgoutput plugin (requires wal_level=logical)"
     core: false
+    alter: true
     probe:
       - "SELECT pg_create_logical_replication_slot('t_logl_{runid}', 'pgoutput')"
     validate:

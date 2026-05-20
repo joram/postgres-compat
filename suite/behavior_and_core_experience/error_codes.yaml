@@ -3,6 +3,7 @@ tests:
   - id: constraints-unique-enforcement
     description: "UNIQUE constraint enforces uniqueness (ERROR 23505)"
     core: true
+    alter: true
     setup:
       - "CREATE TABLE t_unique (id INT UNIQUE)"
       - "INSERT INTO t_unique VALUES (1)"
@@ -15,6 +16,7 @@ tests:
   - id: constraints-check
     description: "CHECK constraint enforcement (ERROR 23514)"
     core: true
+    alter: true
     setup:
       - "CREATE TABLE t_check (id INT CHECK (id > 0))"
     probe:
@@ -26,6 +28,7 @@ tests:
   - id: constraints-not-null
     description: "NOT NULL constraint enforcement (ERROR 23502)"
     core: true
+    alter: true
     setup:
       - "CREATE TABLE t_not_null (id INT NOT NULL)"
     probe:
@@ -37,6 +40,7 @@ tests:
   - id: constraints-exclusion
     description: "Exclusion constraint prevents overlapping ranges (ERROR 23P01)"
     core: true
+    alter: true
     setup:
       - "CREATE TABLE t_excl (r tsrange, EXCLUDE USING gist (r WITH &&))"
       - "INSERT INTO t_excl VALUES ('[2020-01-01, 2020-01-10)'::tsrange)"
@@ -49,6 +53,7 @@ tests:
   - id: error-divide-by-zero
     description: "Division by zero raises ERROR 22012"
     core: true
+    alter: false
     probe:
       - "SELECT 1/0"
     expect_error: "22012"
@@ -56,6 +61,7 @@ tests:
   - id: error-numeric-overflow
     description: "Integer overflow raises ERROR 22003"
     core: true
+    alter: false
     probe:
       - "SELECT 2147483647::int + 1"
     expect_error: "22003"
@@ -63,6 +69,7 @@ tests:
   - id: error-undefined-column
     description: "Reference to undefined column raises ERROR 42703"
     core: true
+    alter: true
     setup:
       - "CREATE TABLE t_undef_col (a INT)"
     probe:
@@ -74,6 +81,7 @@ tests:
   - id: error-undefined-function
     description: "Call to undefined function raises ERROR 42883"
     core: true
+    alter: false
     probe:
       - "SELECT no_such_function_xyz(1)"
     expect_error: "42883"
@@ -81,6 +89,7 @@ tests:
   - id: error-undefined-table
     description: "Reference to undefined table raises ERROR 42P01"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM no_such_table_xyz"
     expect_error: "42P01"
@@ -88,6 +97,7 @@ tests:
   - id: error-fk-violation
     description: "FK violation on insert raises ERROR 23503"
     core: true
+    alter: true
     setup:
       - "CREATE TABLE t_fk_p (id INT PRIMARY KEY)"
       - "CREATE TABLE t_fk_c (pid INT REFERENCES t_fk_p(id))"
@@ -101,6 +111,7 @@ tests:
   - id: error-currval-no-nextval
     description: "currval() before nextval() in session raises ERROR 55000"
     core: true
+    alter: true
     setup:
       - "CREATE SEQUENCE t_seq_nv"
     probe:

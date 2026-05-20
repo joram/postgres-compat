@@ -30,6 +30,7 @@ type yamlTestCase struct {
 	ID                string        `yaml:"id"`
 	Description       string        `yaml:"description"`
 	Core              bool          `yaml:"core"`
+	Alter             bool          `yaml:"alter"`
 	Serial            bool          `yaml:"serial"`
 	SupportedVersions []int         `yaml:"supported_versions"`
 	Setup             []string      `yaml:"setup"`
@@ -109,6 +110,7 @@ func loadSuite() {
 				Topic:             topic,
 				Description:       y.Description,
 				Core:              y.Core,
+				Alter:             y.Alter,
 				Serial:            y.Serial,
 				SupportedVersions: y.SupportedVersions,
 				Setup:             y.Setup,

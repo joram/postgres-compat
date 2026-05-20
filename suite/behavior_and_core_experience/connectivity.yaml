@@ -3,6 +3,7 @@ tests:
   - id: connectivity-application-name-roundtrip
     description: "SET application_name takes effect for the session"
     core: true
+    alter: false
     setup:
       - "SET application_name = 'pgcompat-probe'"
     probe:
@@ -17,6 +18,7 @@ tests:
   - id: connectivity-is-in-recovery
     description: "pg_is_in_recovery() returns a boolean"
     core: true
+    alter: false
     probe:
       - "SELECT pg_is_in_recovery()"
     validate:
@@ -27,6 +29,7 @@ tests:
   - id: connectivity-standard-conforming-strings
     description: "standard_conforming_strings is on (SQL-standard default since PG 9.1; off would silently mis-escape backslashes — correctness and security impact)"
     core: true
+    alter: false
     probe:
       - "SHOW standard_conforming_strings"
     validate:
@@ -37,6 +40,7 @@ tests:
   - id: connectivity-pg-stat-statements-view
     description: "pg_stat_statements view is queryable"
     core: false
+    alter: false
     extension: pg_stat_statements
     probe:
       - "SELECT count(*) FROM pg_stat_statements LIMIT 1"
@@ -48,6 +52,7 @@ tests:
   - id: connectivity-bytea-output-hex
     description: "bytea_output defaults to 'hex' (drivers and pg_dump assume this)"
     core: true
+    alter: false
     probe:
       - "SHOW bytea_output"
     validate:
@@ -58,6 +63,7 @@ tests:
   - id: connectivity-datestyle-iso
     description: "DateStyle defaults to ISO format (drivers assume ISO)"
     core: true
+    alter: false
     probe:
       - "SHOW DateStyle"
     validate:
@@ -68,6 +74,7 @@ tests:
   - id: connectivity-default-transaction-isolation
     description: "default_transaction_isolation is 'read committed' (PG default; ORMs and drivers — Hibernate, SQLAlchemy, libpq — assume Read Committed unless explicitly overridden)"
     core: true
+    alter: false
     probe:
       - "SHOW default_transaction_isolation"
     validate:

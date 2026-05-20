@@ -7,6 +7,7 @@ tests:
   - id: wal-current-lsn-callable
     description: "pg_current_wal_lsn() returns a non-null LSN"
     core: true
+    alter: false
     probe:
       - "SELECT pg_current_wal_lsn()"
     validate:
@@ -17,6 +18,7 @@ tests:
   - id: wal-walfile-name-callable
     description: "pg_walfile_name() returns a 24-char WAL file name"
     core: true
+    alter: false
     probe:
       - "SELECT pg_walfile_name(pg_current_wal_lsn())"
     validate:
@@ -27,6 +29,7 @@ tests:
   - id: wal-lsn-diff-callable
     description: "pg_wal_lsn_diff() returns numeric byte distance between LSNs"
     core: true
+    alter: false
     probe:
       - "SELECT pg_wal_lsn_diff('0/2000000'::pg_lsn, '0/1000000'::pg_lsn)"
     validate:
@@ -37,6 +40,7 @@ tests:
   - id: wal-switch-function-exists
     description: "pg_switch_wal() function present in pg_proc"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_proc WHERE proname = 'pg_switch_wal'"
     validate:
@@ -47,6 +51,7 @@ tests:
   - id: wal-backup-start-function-exists
     description: "pg_backup_start() function present in pg_proc (PG15+)"
     core: true
+    alter: false
     supported_versions: [15, 16, 17, 18]
     probe:
       - "SELECT 1 FROM pg_proc WHERE proname = 'pg_backup_start'"
@@ -58,6 +63,7 @@ tests:
   - id: wal-backup-stop-function-exists
     description: "pg_backup_stop() function present in pg_proc (PG15+)"
     core: true
+    alter: false
     supported_versions: [15, 16, 17, 18]
     probe:
       - "SELECT 1 FROM pg_proc WHERE proname = 'pg_backup_stop'"
@@ -69,6 +75,7 @@ tests:
   - id: wal-start-backup-function-exists-pg14
     description: "pg_start_backup() function present in pg_proc (PG14, removed in PG15)"
     core: true
+    alter: false
     supported_versions: [14]
     probe:
       - "SELECT 1 FROM pg_proc WHERE proname = 'pg_start_backup'"
@@ -80,6 +87,7 @@ tests:
   - id: wal-stop-backup-function-exists-pg14
     description: "pg_stop_backup() function present in pg_proc (PG14, removed in PG15)"
     core: true
+    alter: false
     supported_versions: [14]
     probe:
       - "SELECT 1 FROM pg_proc WHERE proname = 'pg_stop_backup'"
@@ -93,6 +101,7 @@ tests:
   - id: wal-level-visible
     description: "wal_level is visible (replica/logical/minimal)"
     core: true
+    alter: false
     probe:
       - "SHOW wal_level"
     validate:
@@ -103,6 +112,7 @@ tests:
   - id: wal-archive-mode-visible
     description: "archive_mode is visible (on/off/always)"
     core: true
+    alter: false
     probe:
       - "SHOW archive_mode"
     validate:
@@ -113,6 +123,7 @@ tests:
   - id: wal-max-wal-senders-visible
     description: "max_wal_senders is visible as integer"
     core: true
+    alter: false
     probe:
       - "SHOW max_wal_senders"
     validate:
@@ -123,6 +134,7 @@ tests:
   - id: wal-max-replication-slots-visible
     description: "max_replication_slots is visible as integer"
     core: true
+    alter: false
     probe:
       - "SHOW max_replication_slots"
     validate:

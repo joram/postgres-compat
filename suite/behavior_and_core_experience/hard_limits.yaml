@@ -3,6 +3,7 @@ tests:
   - id: limits-namedatalen-truncation
     description: "Identifiers exceeding NAMEDATALEN-1 (63 chars) are silently truncated"
     core: true
+    alter: false
     probe:
       - "SELECT repeat('a', 100)::name"
     validate:

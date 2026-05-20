@@ -19,6 +19,7 @@ type TestCase struct {
 	Topic             string
 	Description       string
 	Core              bool
+	Alter             bool // true if the test writes to the database (DDL/DML); false = read-only safe
 	Setup             []string
 	Probe             []string
 	ExpectError       string // optional SQLSTATE; "" means probe must succeed on last statement

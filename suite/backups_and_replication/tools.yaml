@@ -3,6 +3,7 @@ tests:
   - id: tools-pg-walinspect-decode-records
     description: "pg_walinspect decodes WAL records over a recent LSN range — verifies the decoder actually reads WAL, not just that the function exists in pg_proc. Uses pg_current_wal_lsn() - 4096 as start so we never reference a recycled LSN."
     core: false
+    alter: true
     extension: pg_walinspect
     supported_versions: [15, 16, 17, 18]
     setup:

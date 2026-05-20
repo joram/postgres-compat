@@ -25,9 +25,10 @@ type Report struct {
 	SchemaVersion int       `yaml:"schema_version"`
 	GeneratedAt   time.Time `yaml:"generated_at"`
 	Target        struct {
-		ServerVersion    string `yaml:"server_version"`
-		ServerVersionNum int    `yaml:"server_version_num"`
-		ServerMajor      int    `yaml:"server_major"`
+		ServerVersion        string `yaml:"server_version"`
+		ServerVersionNum     int    `yaml:"server_version_num"`
+		ServerMajor          int    `yaml:"server_major"`
+		PrimaryServerVersion string `yaml:"primary_server_version,omitempty"`
 	} `yaml:"target"`
 	Run struct {
 		Parallel   int   `yaml:"parallel"`
@@ -57,6 +58,7 @@ type TopicResult struct {
 type TestOutput struct {
 	ID            string `yaml:"id"`
 	Core          bool   `yaml:"core"`
+	Alter         bool   `yaml:"alter"`
 	Passed        bool   `yaml:"passed"`
 	DurationMS    int64  `yaml:"duration_ms"`
 	SilentFailure bool   `yaml:"silent_failure"`
@@ -69,6 +71,8 @@ var (
 	targetDB            string // dbname from the connection URL; exposed in YAML SQL via {dbname}
 	targetUser          string // user from the connection URL; exposed in YAML SQL via {user}
 	availableExtensions map[string]bool
+	readOnlyTarget      bool         // true when target is read-only (hot standby or default_transaction_read_only)
+	primaryPool         *pgxpool.Pool // non-nil when -primary-url is set; alter:true tests run here
 	version             = "dev"
 )
 
@@ -82,6 +86,7 @@ func main() {
 func run() int {
 	var (
 		urlStr               = flag.String("url", os.Getenv("PGURL"), "Database connection string")
+		primaryURL           = flag.String("primary-url", os.Getenv("PG_PRIMARY_URL"), "Primary (read-write) connection string. When set, alter:true tests run against the primary and alter:false tests run against -url. Useful for testing a read replica against its primary.")
 		outPath              = flag.String("out", "report.yaml", "Output YAML path")
 		parallel             = flag.Int("parallel", 50, "Max parallel tests")
 		timeout              = flag.Duration("timeout", 30*time.Second, "Per-test timeout")
@@ -147,6 +152,25 @@ func run() int {
 	}
 	defer pool.Close()
 
+	if *primaryURL != "" {
+		primaryConfig, err := pgxpool.ParseConfig(*primaryURL)
+		if err != nil {
+			slog.Error("failed to parse -primary-url", "err", err)
+			return 1
+		}
+		primaryConfig.MaxConns = int32(*parallel)
+		primaryConfig.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
+			_, err := c.Exec(ctx, fmt.Sprintf("SET search_path TO %s, public", runID))
+			return err
+		}
+		primaryPool, err = pgxpool.NewWithConfig(ctx, primaryConfig)
+		if err != nil {
+			slog.Error("failed to create primary connection pool", "err", err)
+			return 1
+		}
+		defer primaryPool.Close()
+	}
+
 	// Pre-flight: pg_regress requires a fresh DB. If the target already has user
 	// objects in non-system schemas, abort early — running anyway produces
 	// spurious diffs in fast_default/select_parallel/vacuum_parallel from
@@ -173,6 +197,29 @@ func run() int {
 		return 1
 	}
 	slog.Info("connected to target", "version", srvVersion, "major", srvMajor)
+
+	// Detect read-only targets: hot standby (pg_is_in_recovery) or session-level
+	// read-only enforcement (default_transaction_read_only = on).
+	if err := pool.QueryRow(ctx,
+		`SELECT pg_is_in_recovery() OR current_setting('default_transaction_read_only')::bool`,
+	).Scan(&readOnlyTarget); err != nil {
+		slog.Error("failed to detect read-only state", "err", err)
+		return 1
+	}
+	var primaryVersion string
+	if primaryPool != nil {
+		if err := primaryPool.QueryRow(ctx, "SELECT current_setting('server_version')").Scan(&primaryVersion); err != nil {
+			slog.Error("failed to query primary server version", "err", err)
+			return 1
+		}
+		if readOnlyTarget {
+			slog.Info("target is read-only — alter:true tests will run against primary", "primary_version", primaryVersion)
+		} else {
+			slog.Info("primary pool configured — alter:true tests will run against primary", "primary_version", primaryVersion)
+		}
+	} else if readOnlyTarget {
+		slog.Info("target is read-only — alter:true tests will be skipped (pass -primary-url to run them against a primary)")
+	}
 
 	var results []Result
 
@@ -269,29 +316,47 @@ func run() int {
 
 	// Now (and only now) set up our test environment. Regressions have completed;
 	// we can install our extensions and run-level schema without perturbing them.
-	_, err = pool.Exec(context.Background(), fmt.Sprintf("CREATE SCHEMA %s", runID))
-	if err != nil {
-		slog.Error("failed to create run schema", "err", err)
-		return 1
+	// On a read-only replica without a primary pool the schema cannot be created;
+	// alter:true tests are skipped. When a primary pool is available, schema and
+	// extension setup runs there — writes replicate to the replica automatically.
+	writePool := pool
+	if primaryPool != nil {
+		writePool = primaryPool
 	}
-	defer func() {
-		slog.Debug("cleaning up run schema", "schema", runID)
-		_, dropErr := pool.Exec(context.Background(), fmt.Sprintf("DROP SCHEMA %s CASCADE", runID))
-		if dropErr != nil {
-			slog.Warn("failed to drop run schema", "schema", runID, "err", dropErr)
+	if !readOnlyTarget || primaryPool != nil {
+		_, err = writePool.Exec(context.Background(), fmt.Sprintf("CREATE SCHEMA %s", runID))
+		if err != nil {
+			if sqlStateOf(err) == "25006" {
+				// Proxy or middleware enforces read-only at the network layer —
+				// not caught by our GUC probes above. Treat as read-only.
+				readOnlyTarget = true
+				slog.Info("target is read-only (detected from CREATE SCHEMA) — alter:true tests will be skipped")
+			} else {
+				slog.Error("failed to create run schema", "err", err)
+				return 1
+			}
+		} else {
+			defer func() {
+				slog.Debug("cleaning up run schema", "schema", runID)
+				_, dropErr := writePool.Exec(context.Background(), fmt.Sprintf("DROP SCHEMA %s CASCADE", runID))
+				if dropErr != nil {
+					slog.Warn("failed to drop run schema", "schema", runID, "err", dropErr)
+				}
+			}()
 		}
-	}()
+	}
 
 	// Extension gate: collect every distinct extension declared by tests, attempt
 	// CREATE EXTENSION for each, and record which succeeded. Tests that declare
 	// an unavailable extension are Skipped (not failed) downstream. Extensions
 	// we installed fresh are dropped at run end (CASCADE; safe because nothing
-	// pre-existing depends on them).
+	// pre-existing depends on them). On a read-only target, provisioning runs
+	// against the primary pool so extensions replicate to the replica.
 	var freshExtensions []string
-	availableExtensions, freshExtensions = provisionExtensions(ctx, pool, Tests)
+	availableExtensions, freshExtensions = provisionExtensions(ctx, writePool, Tests)
 	defer func() {
 		for _, ext := range freshExtensions {
-			if _, err := pool.Exec(context.Background(), fmt.Sprintf("DROP EXTENSION IF EXISTS %q CASCADE", ext)); err != nil {
+			if _, err := writePool.Exec(context.Background(), fmt.Sprintf("DROP EXTENSION IF EXISTS %q CASCADE", ext)); err != nil {
 				slog.Warn("failed to drop extension", "ext", ext, "err", err)
 			}
 		}
@@ -351,6 +416,7 @@ func run() int {
 	rep.Target.ServerVersion = srvVersion
 	rep.Target.ServerVersionNum = srvVersionNum
 	rep.Target.ServerMajor = srvMajor
+	rep.Target.PrimaryServerVersion = primaryVersion
 	rep.Run.Parallel = *parallel
 	rep.Run.DurationMS = runDuration.Milliseconds()
 
@@ -368,6 +434,7 @@ func run() int {
 		out := TestOutput{
 			ID:            r.Test.ID,
 			Core:          r.Test.Core,
+			Alter:         r.Test.Alter,
 			Passed:        passed,
 			DurationMS:    r.DurationMS,
 			SilentFailure: r.SilentFailure,
@@ -519,9 +586,19 @@ func runTest(ctx context.Context, pool *pgxpool.Pool, tc TestCase, srvMajor int,
 		res.Skipped = true
 		res.SkipReason = fmt.Sprintf("extension %q not available", tc.Extension)
 		return
+	case readOnlyTarget && tc.Alter && primaryPool == nil:
+		res.Skipped = true
+		res.SkipReason = "target is a read-only replica"
+		return
 	}
 
-	conn, err := pool.Acquire(ctx)
+	// Route alter:true tests to the primary pool when available.
+	activePool := pool
+	if tc.Alter && primaryPool != nil {
+		activePool = primaryPool
+	}
+
+	conn, err := activePool.Acquire(ctx)
 	if err != nil {
 		res.Err = fmt.Errorf("failed to acquire connection: %w", err)
 		return
@@ -611,6 +688,9 @@ func expandSQL(sql, schemaID string) string {
 // extensions usable by tests plus the subset we installed fresh (caller drops
 // these at run end). CREATE EXTENSION failure is non-fatal — the extension is
 // simply marked unavailable, and dependent tests get Skipped downstream.
+//
+// On a read-only target we skip the CREATE EXTENSION attempt entirely and only
+// mark extensions that are already installed as available.
 func provisionExtensions(ctx context.Context, pool *pgxpool.Pool, tests []TestCase) (available map[string]bool, fresh []string) {
 	available = map[string]bool{}
 	for _, tc := range tests {
@@ -625,7 +705,12 @@ func provisionExtensions(ctx context.Context, pool *pgxpool.Pool, tests []TestCa
 		}
 		if !existed {
 			if _, err := pool.Exec(ctx, fmt.Sprintf("CREATE EXTENSION %q", ext)); err != nil {
-				slog.Info("extension not available — dependent tests will be skipped", "ext", ext, "err", err)
+				if readOnlyTarget && primaryPool == nil {
+					// No write path available — expected, log at debug.
+					slog.Debug("read-only target — extension not available, dependent tests will be skipped", "ext", ext)
+				} else {
+					slog.Info("extension not available — dependent tests will be skipped", "ext", ext, "err", err)
+				}
 				continue
 			}
 			fresh = append(fresh, ext)

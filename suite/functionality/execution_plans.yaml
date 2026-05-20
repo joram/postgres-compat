@@ -3,6 +3,7 @@ tests:
   - id: performance-unlogged-wal-minimal
     description: "UNLOGGED tables produce substantially less WAL than LOGGED tables on bulk insert"
     core: true
+    alter: true
     setup:
       - "CREATE UNLOGGED TABLE t_unlog_u (id INT)"
       - "CREATE TABLE t_unlog_l (id INT)"

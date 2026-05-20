@@ -3,6 +3,7 @@ tests:
   - id: datatype-pg-trgm-similarity
     description: "pg_trgm trigram similarity returns expected score"
     core: false
+    alter: false
     extension: pg_trgm
     probe:
       - "SELECT similarity('postgres', 'postgrey')"
@@ -14,6 +15,7 @@ tests:
   - id: datatype-hstore-roundtrip
     description: "hstore key-value type round-trips through SQL"
     core: false
+    alter: true
     extension: hstore
     setup:
       - "CREATE TABLE t_hs (h hstore)"
@@ -30,6 +32,7 @@ tests:
   - id: datatype-citext-case-insensitive
     description: "citext type performs case-insensitive equality"
     core: false
+    alter: false
     extension: citext
     probe:
       - "SELECT 'Foo'::citext = 'FOO'::citext"
@@ -41,6 +44,7 @@ tests:
   - id: datatype-uuid-ossp-v5-deterministic
     description: "uuid-ossp v5 produces the canonical RFC-4122 v5 UUID for (DNS namespace, 'example.com'). v4 testing was dropped: PG13+ ships gen_random_uuid() in core, so v4 generation is no longer uniquely contrib. uuid-ossp v1/v3/v5 remain contrib-only."
     core: false
+    alter: false
     extension: uuid-ossp
     probe:
       - "SELECT uuid_generate_v5(uuid_ns_dns(), 'example.com')"
@@ -52,6 +56,7 @@ tests:
   - id: datatype-ltree-containment
     description: "ltree label tree containment operator <@"
     core: false
+    alter: false
     extension: ltree
     probe:
       - "SELECT 'a.b.c'::ltree <@ 'a.b'::ltree"
@@ -63,6 +68,7 @@ tests:
   - id: datatype-intarray-idx
     description: "intarray idx() returns 1-based position of element in int array"
     core: false
+    alter: false
     extension: intarray
     probe:
       - "SELECT idx(ARRAY[10,20,30,40]::int[], 30)"

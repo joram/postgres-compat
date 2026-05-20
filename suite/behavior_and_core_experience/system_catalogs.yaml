@@ -7,6 +7,7 @@ tests:
   - id: catalog-pg-class-populated
     description: "pg_class is queryable and non-empty"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_class LIMIT 1"
     validate:
@@ -17,6 +18,7 @@ tests:
   - id: catalog-pg-proc-builtin
     description: "pg_proc exposes built-in functions (now())"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_proc WHERE proname = 'now'"
     validate:
@@ -27,6 +29,7 @@ tests:
   - id: catalog-information-schema-tables
     description: "information_schema.tables is queryable"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM information_schema.tables LIMIT 1"
     validate:
@@ -37,6 +40,7 @@ tests:
   - id: catalog-current-database
     description: "current_database() returns a non-empty name"
     core: true
+    alter: false
     probe:
       - "SELECT current_database()"
     validate:
@@ -49,6 +53,7 @@ tests:
   - id: catalog-pageinspect-page-header-lsn
     description: "pageinspect page_header() returns a header whose LSN is <= the current WAL LSN — verifies a structural relationship rather than just non-NULL"
     core: false
+    alter: false
     extension: pageinspect
     probe:
       - "SELECT lsn FROM page_header(get_raw_page('pg_class', 0))"
@@ -60,6 +65,7 @@ tests:
   - id: catalog-pg-buffercache-row-count
     description: "pg_buffercache view exposes exactly one row per shared_buffers 8KB page — verifies the view actually mirrors buffer cache state, not just that it's queryable"
     core: false
+    alter: false
     extension: pg_buffercache
     probe:
       - "SELECT count(*) FROM pg_buffercache"

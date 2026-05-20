@@ -3,6 +3,7 @@ tests:
   - id: replication-physical-slot
     description: "Physical replication slot can be created and inspected"
     core: true
+    alter: true
     probe:
       - "SELECT pg_create_physical_replication_slot('t_phys_{runid}', false)"
     validate:

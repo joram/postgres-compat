@@ -3,6 +3,7 @@ tests:
   - id: feature-pgcrypto-digest
     description: "pgcrypto digest() returns SHA-256 hash"
     core: false
+    alter: false
     extension: pgcrypto
     probe:
       - "SELECT digest('hello', 'sha256')"
@@ -14,6 +15,7 @@ tests:
   - id: feature-postgres-fdw-loopback-query
     description: "postgres_fdw federates a SELECT through a self-loopback server (Unix socket, local trust auth). Verifies BeginForeignScan → IterateForeignScan → EndForeignScan end-to-end, not just CREATE SERVER."
     core: false
+    alter: true
     extension: postgres_fdw
     setup:
       - "CREATE SERVER t_fdw_lo_{runid} FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '/tmp', dbname '{dbname}')"
@@ -33,6 +35,7 @@ tests:
   - id: feature-tablefunc-crosstab
     description: "tablefunc crosstab() pivots row data into columns"
     core: false
+    alter: false
     extension: tablefunc
     probe:
       - "SELECT * FROM crosstab($$ SELECT 'r1', 'c1', 1 UNION ALL SELECT 'r1', 'c2', 2 ORDER BY 1,2 $$) AS ct(rn text, c1 int, c2 int)"
@@ -44,6 +47,7 @@ tests:
   - id: feature-tsm-system-rows
     description: "TABLESAMPLE SYSTEM_ROWS returns the requested row count"
     core: false
+    alter: true
     extension: tsm_system_rows
     setup:
       - "CREATE TABLE t_tsm (id INT)"

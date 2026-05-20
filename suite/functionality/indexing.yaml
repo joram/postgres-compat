@@ -3,6 +3,7 @@ tests:
   - id: indexing-btree-create
     description: "CREATE INDEX (BTREE) lands a catalog entry"
     core: true
+    alter: true
     setup:
       - "CREATE TABLE t_idx_btree (id INT)"
     probe:
@@ -17,6 +18,7 @@ tests:
   - id: indexing-gin-create
     description: "CREATE INDEX (GIN) lands a catalog entry"
     core: true
+    alter: true
     setup:
       - "CREATE TABLE t_idx_gin (doc JSONB)"
     probe:
@@ -31,6 +33,7 @@ tests:
   - id: indexing-gist-create
     description: "CREATE INDEX (GIST) lands a catalog entry"
     core: true
+    alter: true
     setup:
       - "CREATE TABLE t_idx_gist (r tsrange)"
     probe:
@@ -45,6 +48,7 @@ tests:
   - id: indexing-hash-create
     description: "CREATE INDEX (HASH) lands a catalog entry"
     core: false
+    alter: true
     setup:
       - "CREATE TABLE t_idx_hash (id INT)"
     probe:
@@ -59,6 +63,7 @@ tests:
   - id: indexing-btree-gist-exclusion
     description: "btree_gist enables exclusion constraints with equality on integers"
     core: false
+    alter: true
     extension: btree_gist
     setup:
       - "CREATE TABLE t_bt_gist (id INT, EXCLUDE USING gist (id WITH =))"
@@ -72,6 +77,7 @@ tests:
   - id: indexing-bloom-create-and-query
     description: "CREATE INDEX (BLOOM) creates a usable index; a multi-column equality query through the table returns the single matching row"
     core: false
+    alter: true
     extension: bloom
     setup:
       - "CREATE TABLE t_idx_bloom (a INT, b INT, c INT)"

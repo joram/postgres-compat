@@ -8,6 +8,7 @@ tests:
   - id: maint-alter-system-silent-failure
     description: "ALTER SYSTEM SET writes to postgresql.auto.conf (anti-silent-failure)"
     core: true
+    alter: true
     serial: true
     probe:
       - "ALTER SYSTEM SET log_min_duration_statement = 12345"
@@ -24,6 +25,7 @@ tests:
   - id: maint-checkpoint
     description: "CHECKPOINT command succeeds (requires superuser or pg_checkpoint role)"
     core: true
+    alter: true
     probe:
       - "CHECKPOINT"
 
@@ -32,48 +34,56 @@ tests:
   - id: maint-pg-stat-progress-vacuum
     description: "pg_stat_progress_vacuum view is queryable"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_stat_progress_vacuum LIMIT 1"
 
   - id: maint-pg-stat-progress-analyze
     description: "pg_stat_progress_analyze view is queryable"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_stat_progress_analyze LIMIT 1"
 
   - id: maint-pg-stat-progress-cluster
     description: "pg_stat_progress_cluster view is queryable"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_stat_progress_cluster LIMIT 1"
 
   - id: maint-pg-stat-progress-create-index
     description: "pg_stat_progress_create_index view is queryable"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_stat_progress_create_index LIMIT 1"
 
   - id: maint-pg-stat-progress-basebackup
     description: "pg_stat_progress_basebackup view is queryable"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_stat_progress_basebackup LIMIT 1"
 
   - id: maint-pg-stat-progress-copy
     description: "pg_stat_progress_copy view is queryable (PG14+)"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_stat_progress_copy LIMIT 1"
 
   - id: maint-pg-stat-wal
     description: "pg_stat_wal view is queryable (PG14+)"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_stat_wal LIMIT 1"
 
   - id: maint-pg-stat-io
     description: "pg_stat_io view is queryable (PG16+)"
     core: true
+    alter: false
     supported_versions: [16, 17, 18]
     probe:
       - "SELECT 1 FROM pg_stat_io LIMIT 1"
@@ -84,6 +94,7 @@ tests:
   - id: maint-pg-blocking-pids
     description: "pg_blocking_pids() returns array (lock blocker diagnosis)"
     core: true
+    alter: false
     probe:
       - "SELECT pg_blocking_pids(pg_backend_pid())"
     validate:
@@ -94,6 +105,7 @@ tests:
   - id: maint-wait-event-columns
     description: "pg_stat_activity exposes wait_event_type and wait_event columns"
     core: true
+    alter: false
     probe:
       - "SELECT wait_event_type, wait_event FROM pg_stat_activity WHERE pid = pg_backend_pid()"
     validate:
@@ -104,6 +116,7 @@ tests:
   - id: maint-pg-cancel-backend-exists
     description: "pg_cancel_backend() function present in pg_proc"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_proc WHERE proname = 'pg_cancel_backend'"
     validate:
@@ -114,6 +127,7 @@ tests:
   - id: maint-pg-terminate-backend-exists
     description: "pg_terminate_backend() function present in pg_proc"
     core: true
+    alter: false
     probe:
       - "SELECT 1 FROM pg_proc WHERE proname = 'pg_terminate_backend'"
     validate:
@@ -127,6 +141,7 @@ tests:
   - id: maint-discard-all
     description: "DISCARD ALL succeeds (used by connection poolers)"
     core: true
+    alter: false
     probe:
       - "DISCARD ALL"
 
@@ -135,6 +150,7 @@ tests:
   - id: maint-amcheck-bt-index-check
     description: "amcheck bt_index_check() verifies a B-tree index without error"
     core: false
+    alter: true
     extension: amcheck
     setup:
       - "CREATE TABLE t_amcheck (id INT)"
